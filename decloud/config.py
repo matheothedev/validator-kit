@@ -30,6 +30,9 @@ NETWORKS = {
 # Default program ID from lib.rs
 DEFAULT_PROGRAM_ID = "HvQ8c3BBCsibJpH74UDXbvqEidJymzFYyGjNjRn7MYwC"
 
+# Treasury address
+TREASURY = "FzuCxi65QyFXAGbHcXB28RXqyBZSZ5KXLQxeofx1P9K2"
+
 
 @dataclass
 class Config:
@@ -59,6 +62,7 @@ class Config:
     
     # Auth
     private_key: Optional[str] = None
+    referrer: Optional[str] = None  # Реферал который привёл (получает 50% от комиссии)
     
     # Filters
     min_reward: float = 0.0  # SOL

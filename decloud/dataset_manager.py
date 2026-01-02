@@ -679,10 +679,13 @@ class DatasetManager:
         # Normalize name
         name_lower = name.lower().replace("_", "")
         
-        # Check HuggingFace format: ./data/Cifar10
-        hf_path = os.path.join(self.data_dir, name)
-        if os.path.exists(hf_path):
-            return True
+        # Check HuggingFace format: ./data/Cifar10 or ./data/cifar10
+        # Try multiple case variants
+        name_variants = [name, name.lower(), name.capitalize(), name.title()]
+        for variant in name_variants:
+            hf_path = os.path.join(self.data_dir, variant)
+            if os.path.exists(hf_path):
+                return True
         
         # Check torchvision formats
         torchvision_paths = {

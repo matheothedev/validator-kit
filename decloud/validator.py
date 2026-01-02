@@ -540,6 +540,67 @@ const validator = Keypair.fromSecretKey(bs58.decode("{self._private_key}"));
         if not self._private_key:
             raise RuntimeError("Not logged in")
         
+        # Получаем referrer из конфига
+        referrer_js = "null"
+        if self.config.referrer:
+            referrer_js = f'new PublicKey("{self.config.referrer}")'
+        
+        idl_path = self.config.idl_path
+        script = f'''
+const anchor = require("@coral-xyz/anchor");
+const {{ Connection, PublicKey, Keypair }} = require("@solana/web3.js");
+const bs58 = require("bs58");
+const fs = require("fs");
+
+const conn = new Connection("{self.config.rpc_url}", "confirmed");
+const programId = new PublicKey("{self.config.program_id}");
+const idl = JSON.parse(fs.readFileSync("{idl_path}"));
+const validator = Keypair.fromSecretKey(bs58.decode("{self._private_key}"));
+
+const TREASURY = new PublicKey("FzuCxi65QyFXAGbHcXB28RXqyBZSZ5KXLQxeofx1P9K2");
+
+(async () => {{
+    const wallet = new anchor.Wallet(validator);
+    const provider = new anchor.AnchorProvider(conn, wallet, {{}});
+    const program = new anchor.Program(idl, provider);
+    
+    const roundId = new anchor.BN({round_id});
+    const [roundPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("round"), roundId.toArrayLike(Buffer, "le", 8)],
+        programId
+    );
+    const [vaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("vault"), roundId.toArrayLike(Buffer, "le", 8)],
+        programId
+    );
+    
+    const referrer = {referrer_js};
+    
+    const tx = await program.methods
+        .completeValidation(roundId)
+        .accounts({{
+            round: roundPda,
+            vault: vaultPda,
+            treasury: TREASURY,
+            referrer: referrer,
+            validator: validator.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+        }})
+        .signers([validator])
+        .rpc();
+    console.log(tx);
+}})();
+'''
+        return self._run_node(script)
+    
+    def abort_round(self, round_id: int, creator: str) -> str:
+        """
+        Abort round and refund all money to creator.
+        Works on: WaitingTrainers, Training, Validating statuses.
+        """
+        if not self._private_key:
+            raise RuntimeError("Not logged in")
+        
         idl_path = self.config.idl_path
         script = f'''
 const anchor = require("@coral-xyz/anchor");
@@ -566,12 +627,14 @@ const validator = Keypair.fromSecretKey(bs58.decode("{self._private_key}"));
         [Buffer.from("vault"), roundId.toArrayLike(Buffer, "le", 8)],
         programId
     );
+    const creator = new PublicKey("{creator}");
     
     const tx = await program.methods
-        .completeValidation(roundId)
+        .abortRound(roundId)
         .accounts({{
             round: roundPda,
             vault: vaultPda,
+            creator: creator,
             validator: validator.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
         }})
